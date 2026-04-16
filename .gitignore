@@ -1,0 +1,30 @@
+# Abhängigkeiten
+node_modules
+.pnp
+.pnp.js
+
+# Build-Ausgaben
+dist
+dist-ssr
+build
+
+# Umgebungsvariablen (NIEMALS committen!)
+.env
+.env.local
+.env.*.local
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
