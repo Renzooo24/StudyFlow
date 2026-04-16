@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { BookOpen, User, Mail, Lock, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
+import { BookOpen, User, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabase'
 
