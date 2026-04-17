@@ -1,20 +1,27 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { BookOpen, Loader2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { BookOpen, Loader2, CheckCircle2, Star } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabase'
 
 // ─── Typen ────────────────────────────────────────────────────────────────────
 
 interface FormData {
+  // Schritt 1
   name: string
   university: string
   studyProgram: string
   semester: number
+  // Schritt 2
+  examName: string
+  examDate: string
+  examDifficulty: number
 }
 
-// ─── Fortschrittsbalken ───────────────────────────────────────────────────────
+const TOTAL_STEPS = 3
+
+// ─── Hilfskomponenten ─────────────────────────────────────────────────────────
 
 function ProgressBar({ current, total }: { current: number; total: number }) {
   const percent = Math.round((current / total) * 100)
@@ -28,7 +35,6 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
         <motion.div
           className="h-1.5 rounded-full"
           style={{ backgroundColor: '#7C6FFF' }}
-          initial={{ width: 0 }}
           animate={{ width: `${percent}%` }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
         />
@@ -37,19 +43,12 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
   )
 }
 
-// ─── Eingabefeld ──────────────────────────────────────────────────────────────
-
-function Field({
-  label,
-  children,
-}: {
-  label: string
-  children: React.ReactNode
-}) {
+function Field({ label, optional, children }: { label: string; optional?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium mb-2" style={{ color: '#B0B0C8' }}>
+      <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ color: '#B0B0C8' }}>
         {label}
+        {optional && <span className="text-xs font-normal" style={{ color: '#6060A0' }}>(optional)</span>}
       </label>
       {children}
     </div>
@@ -68,30 +67,64 @@ const inputStyle = (focused: boolean): React.CSSProperties => ({
   transition: 'border-color 0.15s',
 })
 
-// ─── Seite ────────────────────────────────────────────────────────────────────
+function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [hovered, setHovered] = useState(0)
+  return (
+    <div className="flex gap-2 mt-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange(star)}
+          onMouseEnter={() => setHovered(star)}
+          onMouseLeave={() => setHovered(0)}
+          className="transition-transform hover:scale-110"
+        >
+          <Star
+            size={28}
+            fill={(hovered || value) >= star ? '#7C6FFF' : 'transparent'}
+            stroke={(hovered || value) >= star ? '#7C6FFF' : '#3A3A4A'}
+            strokeWidth={1.5}
+          />
+        </button>
+      ))}
+      <span className="ml-2 text-sm self-center" style={{ color: '#9090A8' }}>
+        {['', 'Sehr leicht', 'Leicht', 'Mittel', 'Schwer', 'Sehr schwer'][hovered || value]}
+      </span>
+    </div>
+  )
+}
 
-const TOTAL_STEPS = 3
+// ─── Slide-Animation ──────────────────────────────────────────────────────────
+
+const slideVariants = {
+  enter: (dir: number) => ({ x: dir > 0 ? 60 : -60, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: number) => ({ x: dir > 0 ? -60 : 60, opacity: 0 }),
+}
+
+// ─── Haupt-Komponente ─────────────────────────────────────────────────────────
 
 export default function Onboarding() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
 
   const [currentStep, setCurrentStep] = useState(1)
+  const [direction, setDirection] = useState(1)
   const [formData, setFormData] = useState<FormData>({
     name: '',
     university: '',
     studyProgram: '',
     semester: 1,
+    examName: '',
+    examDate: '',
+    examDifficulty: 3,
   })
-
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [focusedField, setFocusedField] = useState<string | null>(null)
 
-  // Profil laden – wenn university bereits gesetzt → direkt zum Dashboard
   useEffect(() => {
     if (!user) return
-
     async function loadProfile() {
       const { data } = await supabase
         .from('user_profiles')
@@ -100,52 +133,52 @@ export default function Onboarding() {
         .single()
 
       if (data?.university) {
-        // Onboarding bereits abgeschlossen
         navigate('/dashboard', { replace: true })
         return
       }
 
-      // Vorname vorbelegen falls vorhanden
       setFormData((prev) => ({
         ...prev,
         name: data?.name ?? user!.user_metadata?.full_name ?? '',
         studyProgram: data?.study_program ?? '',
         semester: data?.semester ?? 1,
       }))
-
       setLoading(false)
     }
-
     loadProfile()
   }, [user, navigate])
 
-  const handleNext = async () => {
-    if (currentStep === 1) {
-      setSubmitting(true)
-
-      // Profil-Daten zwischenspeichern (noch nicht finalisieren)
-      const { error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          id: user!.id,
-          name: formData.name.trim() || (user!.user_metadata?.full_name ?? ''),
-          university: formData.university.trim() || null,
-          study_program: formData.studyProgram.trim() || null,
-          semester: formData.semester,
-        })
-
-      setSubmitting(false)
-
-      if (error) {
-        console.error('Profil speichern fehlgeschlagen:', error.message)
-      }
-
-      // Schritt 2 (kommt morgen)
-      setCurrentStep(2)
-    }
+  const goTo = (step: number) => {
+    setDirection(step > currentStep ? 1 : -1)
+    setCurrentStep(step)
   }
 
-  // ─── Ladezustand ────────────────────────────────────────────────────────────
+  const handleStep1 = async () => {
+    setSubmitting(true)
+    await supabase.from('user_profiles').upsert({
+      id: user!.id,
+      name: formData.name.trim() || (user!.user_metadata?.full_name ?? ''),
+      university: formData.university.trim() || null,
+      study_program: formData.studyProgram.trim() || null,
+      semester: formData.semester,
+    })
+    setSubmitting(false)
+    goTo(2)
+  }
+
+  const handleStep2 = async (skip = false) => {
+    if (!skip && formData.examName.trim() && formData.examDate) {
+      setSubmitting(true)
+      await supabase.from('exams').insert({
+        user_id: user!.id,
+        name: formData.examName.trim(),
+        exam_date: formData.examDate,
+        color: '#7C6FFF',
+      })
+      setSubmitting(false)
+    }
+    goTo(3)
+  }
 
   if (loading) {
     return (
@@ -155,56 +188,12 @@ export default function Onboarding() {
     )
   }
 
-  // ─── Schritt 2 Platzhalter (kommt morgen) ───────────────────────────────────
-
-  if (currentStep === 2) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#0F0F14' }}>
-        <div className="w-full max-w-md">
-          <ProgressBar current={2} total={TOTAL_STEPS} />
-          <div
-            className="rounded-2xl p-8 text-center"
-            style={{ backgroundColor: '#16161F', border: '1px solid #2A2A3A' }}
-          >
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
-              style={{ backgroundColor: '#7C6FFF' }}
-            >
-              <BookOpen size={28} color="#ffffff" />
-            </div>
-            <h2 className="text-xl font-semibold mb-2" style={{ color: '#E8E8F0' }}>
-              Schritt 2 kommt bald!
-            </h2>
-            <p className="text-sm mb-6" style={{ color: '#9090A8' }}>
-              Dein Profil wurde gespeichert. Der nächste Schritt wird morgen implementiert.
-            </p>
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white"
-              style={{ backgroundColor: '#7C6FFF' }}
-            >
-              Zum Dashboard →
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Schritt 1 ──────────────────────────────────────────────────────────────
-
   return (
     <div
       className="min-h-screen flex items-center justify-center px-4 py-12"
       style={{ backgroundColor: '#0F0F14' }}
     >
-      <motion.div
-        className="w-full max-w-md"
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-      >
-        {/* Logo */}
+      <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
@@ -217,102 +206,262 @@ export default function Onboarding() {
           </h1>
         </div>
 
-        {/* Fortschrittsbalken */}
         <ProgressBar current={currentStep} total={TOTAL_STEPS} />
 
-        {/* Card */}
-        <div
-          className="rounded-2xl p-8"
-          style={{ backgroundColor: '#16161F', border: '1px solid #2A2A3A' }}
-        >
-          <h2 className="text-2xl font-bold mb-1" style={{ color: '#E8E8F0' }}>
-            Erzähl uns von dir 👋
-          </h2>
-          <p className="text-sm mb-6" style={{ color: '#9090A8' }}>
-            Diese Angaben helfen uns, StudyFlow für dich anzupassen.
-          </p>
-
-          <div className="space-y-5">
-            {/* Vorname */}
-            <Field label="Vorname">
-              <input
-                type="text"
-                autoComplete="given-name"
-                value={formData.name}
-                onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
-                onFocus={() => setFocusedField('name')}
-                onBlur={() => setFocusedField(null)}
-                placeholder="Max"
-                style={inputStyle(focusedField === 'name')}
-              />
-            </Field>
-
-            {/* Hochschule */}
-            <Field label="Hochschule (optional)">
-              <input
-                type="text"
-                value={formData.university}
-                onChange={(e) => setFormData((p) => ({ ...p, university: e.target.value }))}
-                onFocus={() => setFocusedField('university')}
-                onBlur={() => setFocusedField(null)}
-                placeholder="z.B. TU München"
-                style={inputStyle(focusedField === 'university')}
-              />
-            </Field>
-
-            {/* Studiengang */}
-            <Field label="Studiengang (optional)">
-              <input
-                type="text"
-                value={formData.studyProgram}
-                onChange={(e) => setFormData((p) => ({ ...p, studyProgram: e.target.value }))}
-                onFocus={() => setFocusedField('studyProgram')}
-                onBlur={() => setFocusedField(null)}
-                placeholder="z.B. Informatik B.Sc."
-                style={inputStyle(focusedField === 'studyProgram')}
-              />
-            </Field>
-
-            {/* Semester */}
-            <Field label="Semester">
-              <select
-                value={formData.semester}
-                onChange={(e) => setFormData((p) => ({ ...p, semester: Number(e.target.value) }))}
-                onFocus={() => setFocusedField('semester')}
-                onBlur={() => setFocusedField(null)}
-                style={inputStyle(focusedField === 'semester')}
-              >
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((s) => (
-                  <option key={s} value={s} style={{ backgroundColor: '#1A1A22' }}>
-                    {s}. Semester
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-
-          {/* Weiter-Button */}
-          <button
-            onClick={handleNext}
-            disabled={submitting}
-            className="w-full py-3 rounded-xl text-sm font-semibold text-white mt-8 transition-opacity"
-            style={{
-              backgroundColor: '#7C6FFF',
-              opacity: submitting ? 0.7 : 1,
-              cursor: submitting ? 'not-allowed' : 'pointer',
-            }}
+        <AnimatePresence mode="wait" custom={direction}>
+          <motion.div
+            key={currentStep}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
           >
-            {submitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <Loader2 size={16} className="animate-spin" />
-                Wird gespeichert…
-              </span>
-            ) : (
-              'Weiter →'
+            {currentStep === 1 && (
+              <Step1
+                formData={formData}
+                setFormData={setFormData}
+                submitting={submitting}
+                onNext={handleStep1}
+              />
             )}
-          </button>
+            {currentStep === 2 && (
+              <Step2
+                formData={formData}
+                setFormData={setFormData}
+                submitting={submitting}
+                onBack={() => goTo(1)}
+                onNext={() => handleStep2(false)}
+                onSkip={() => handleStep2(true)}
+              />
+            )}
+            {currentStep === 3 && (
+              <Step3
+                examName={formData.examName}
+                onFinish={() => navigate('/dashboard', { replace: true })}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}
+
+// ─── Schritt 1: Profil ────────────────────────────────────────────────────────
+
+function Step1({
+  formData, setFormData, submitting, onNext,
+}: {
+  formData: FormData
+  setFormData: React.Dispatch<React.SetStateAction<FormData>>
+  submitting: boolean
+  onNext: () => void
+}) {
+  const [focused, setFocused] = useState<string | null>(null)
+
+  return (
+    <div className="rounded-2xl p-8" style={{ backgroundColor: '#16161F', border: '1px solid #2A2A3A' }}>
+      <h2 className="text-2xl font-bold mb-1" style={{ color: '#E8E8F0' }}>Erzähl uns von dir 👋</h2>
+      <p className="text-sm mb-6" style={{ color: '#9090A8' }}>
+        Diese Angaben helfen uns, StudyFlow für dich anzupassen.
+      </p>
+
+      <div className="space-y-5">
+        <Field label="Vorname">
+          <input
+            type="text"
+            autoComplete="given-name"
+            value={formData.name}
+            onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+            onFocus={() => setFocused('name')}
+            onBlur={() => setFocused(null)}
+            placeholder="Max"
+            style={inputStyle(focused === 'name')}
+          />
+        </Field>
+        <Field label="Hochschule" optional>
+          <input
+            type="text"
+            value={formData.university}
+            onChange={(e) => setFormData((p) => ({ ...p, university: e.target.value }))}
+            onFocus={() => setFocused('university')}
+            onBlur={() => setFocused(null)}
+            placeholder="z.B. TU München"
+            style={inputStyle(focused === 'university')}
+          />
+        </Field>
+        <Field label="Studiengang" optional>
+          <input
+            type="text"
+            value={formData.studyProgram}
+            onChange={(e) => setFormData((p) => ({ ...p, studyProgram: e.target.value }))}
+            onFocus={() => setFocused('studyProgram')}
+            onBlur={() => setFocused(null)}
+            placeholder="z.B. Informatik B.Sc."
+            style={inputStyle(focused === 'studyProgram')}
+          />
+        </Field>
+        <Field label="Semester">
+          <select
+            value={formData.semester}
+            onChange={(e) => setFormData((p) => ({ ...p, semester: Number(e.target.value) }))}
+            onFocus={() => setFocused('semester')}
+            onBlur={() => setFocused(null)}
+            style={inputStyle(focused === 'semester')}
+          >
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((s) => (
+              <option key={s} value={s} style={{ backgroundColor: '#1A1A22' }}>
+                {s}. Semester
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      <button
+        onClick={onNext}
+        disabled={submitting}
+        className="w-full py-3 rounded-xl text-sm font-semibold text-white mt-8 transition-opacity"
+        style={{ backgroundColor: '#7C6FFF', opacity: submitting ? 0.7 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}
+      >
+        {submitting
+          ? <span className="flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" />Wird gespeichert…</span>
+          : 'Weiter →'}
+      </button>
+    </div>
+  )
+}
+
+// ─── Schritt 2: Erste Prüfung ─────────────────────────────────────────────────
+
+function Step2({
+  formData, setFormData, submitting, onBack, onNext, onSkip,
+}: {
+  formData: FormData
+  setFormData: React.Dispatch<React.SetStateAction<FormData>>
+  submitting: boolean
+  onBack: () => void
+  onNext: () => void
+  onSkip: () => void
+}) {
+  const [focused, setFocused] = useState<string | null>(null)
+  const canSubmit = formData.examName.trim().length > 0 && formData.examDate.length > 0
+
+  return (
+    <div className="rounded-2xl p-8" style={{ backgroundColor: '#16161F', border: '1px solid #2A2A3A' }}>
+      <h2 className="text-2xl font-bold mb-1" style={{ color: '#E8E8F0' }}>Deine erste Prüfung 📅</h2>
+      <p className="text-sm mb-6" style={{ color: '#9090A8' }}>
+        Was steht als Nächstes an?
+      </p>
+
+      <div className="space-y-5">
+        <Field label="Fachname">
+          <input
+            type="text"
+            value={formData.examName}
+            onChange={(e) => setFormData((p) => ({ ...p, examName: e.target.value }))}
+            onFocus={() => setFocused('examName')}
+            onBlur={() => setFocused(null)}
+            placeholder="z.B. Mathematik II"
+            style={inputStyle(focused === 'examName')}
+          />
+        </Field>
+
+        <Field label="Prüfungsdatum">
+          <input
+            type="date"
+            value={formData.examDate}
+            onChange={(e) => setFormData((p) => ({ ...p, examDate: e.target.value }))}
+            onFocus={() => setFocused('examDate')}
+            onBlur={() => setFocused(null)}
+            min={new Date().toISOString().split('T')[0]}
+            style={{ ...inputStyle(focused === 'examDate'), colorScheme: 'dark' }}
+          />
+        </Field>
+
+        <Field label="Schwierigkeit">
+          <StarRating
+            value={formData.examDifficulty}
+            onChange={(v) => setFormData((p) => ({ ...p, examDifficulty: v }))}
+          />
+        </Field>
+      </div>
+
+      <div className="flex gap-3 mt-8">
+        <button
+          onClick={onBack}
+          className="flex-1 py-3 rounded-xl text-sm font-semibold transition-opacity hover:opacity-80"
+          style={{ backgroundColor: '#1A1A22', color: '#9090A8', border: '1px solid #2A2A3A' }}
+        >
+          ← Zurück
+        </button>
+        <button
+          onClick={onNext}
+          disabled={submitting || !canSubmit}
+          className="flex-1 py-3 rounded-xl text-sm font-semibold text-white transition-opacity"
+          style={{
+            backgroundColor: '#7C6FFF',
+            opacity: submitting || !canSubmit ? 0.5 : 1,
+            cursor: submitting || !canSubmit ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {submitting
+            ? <span className="flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" />…</span>
+            : 'Weiter →'}
+        </button>
+      </div>
+
+      <button
+        onClick={onSkip}
+        className="w-full py-2.5 text-sm mt-3 transition-opacity hover:opacity-80"
+        style={{ color: '#6060A0' }}
+      >
+        Überspringen
+      </button>
+    </div>
+  )
+}
+
+// ─── Schritt 3: Abschluss ─────────────────────────────────────────────────────
+
+function Step3({ examName, onFinish }: { examName: string; onFinish: () => void }) {
+  return (
+    <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: '#16161F', border: '1px solid #2A2A3A' }}>
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
+        className="flex justify-center mb-6"
+      >
+        <div
+          className="w-20 h-20 rounded-full flex items-center justify-center"
+          style={{ backgroundColor: '#0F2D1B', border: '2px solid #4ADE80' }}
+        >
+          <CheckCircle2 size={40} color="#4ADE80" />
         </div>
       </motion.div>
+
+      <h2 className="text-2xl font-bold mb-2" style={{ color: '#E8E8F0' }}>Alles bereit! 🎉</h2>
+      <p className="text-sm mb-2" style={{ color: '#9090A8' }}>Dein Profil ist eingerichtet.</p>
+      {examName && (
+        <p className="text-sm mb-8" style={{ color: '#9090A8' }}>
+          Prüfung <span style={{ color: '#7C6FFF', fontWeight: 600 }}>„{examName}"</span> wurde hinzugefügt.
+        </p>
+      )}
+      {!examName && <div className="mb-8" />}
+
+      <motion.button
+        onClick={onFinish}
+        className="w-full py-3 rounded-xl text-sm font-semibold text-white"
+        style={{ backgroundColor: '#7C6FFF' }}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        Zu StudyFlow →
+      </motion.button>
     </div>
   )
 }
