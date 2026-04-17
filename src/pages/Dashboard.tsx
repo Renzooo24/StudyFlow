@@ -1,10 +1,46 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { LogOut, BookOpen } from 'lucide-react'
+import { LogOut, BookOpen, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import { supabase } from '../lib/supabase'
 
 export default function Dashboard() {
   const { user, logout } = useAuthStore()
+  const navigate = useNavigate()
+  const [checking, setChecking] = useState(true)
+
   const name = user?.user_metadata?.full_name ?? user?.email ?? 'Lernender'
+
+  // Onboarding-Check: falls Profil noch nicht vollständig → /onboarding
+  useEffect(() => {
+    if (!user) return
+
+    async function checkOnboarding() {
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('university')
+        .eq('id', user!.id)
+        .single()
+
+      if (!data?.university) {
+        navigate('/onboarding', { replace: true })
+        return
+      }
+
+      setChecking(false)
+    }
+
+    checkOnboarding()
+  }, [user, navigate])
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0F0F14' }}>
+        <Loader2 size={32} className="animate-spin" style={{ color: '#7C6FFF' }} />
+      </div>
+    )
+  }
 
   return (
     <div
