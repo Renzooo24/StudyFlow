@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BookOpen, Loader2, CheckCircle2, Star } from 'lucide-react'
+import { BookOpen, Loader2, Star, AlertCircle } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabase'
 
@@ -122,6 +122,7 @@ export default function Onboarding() {
   })
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -153,31 +154,40 @@ export default function Onboarding() {
     setCurrentStep(step)
   }
 
-  const handleStep1 = async () => {
+  const handleFinish = async () => {
+    setSaveError(null)
     setSubmitting(true)
-    await supabase.from('user_profiles').upsert({
-      id: user!.id,
-      name: formData.name.trim() || (user!.user_metadata?.full_name ?? ''),
-      university: formData.university.trim() || null,
-      study_program: formData.studyProgram.trim() || null,
-      semester: formData.semester,
-    })
-    setSubmitting(false)
-    goTo(2)
-  }
+    try {
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .upsert({
+          id: user!.id,
+          name: formData.name.trim() || (user!.user_metadata?.full_name ?? ''),
+          university: formData.university.trim() || null,
+          study_program: formData.studyProgram.trim() || null,
+          semester: formData.semester,
+        })
 
-  const handleStep2 = async (skip = false) => {
-    if (!skip && formData.examName.trim() && formData.examDate) {
-      setSubmitting(true)
-      await supabase.from('exams').insert({
-        user_id: user!.id,
-        name: formData.examName.trim(),
-        exam_date: formData.examDate,
-        color: '#7C6FFF',
-      })
+      if (profileError) throw profileError
+
+      if (formData.examName.trim() && formData.examDate) {
+        const { error: examError } = await supabase
+          .from('exams')
+          .insert({
+            user_id: user!.id,
+            name: formData.examName.trim(),
+            exam_date: formData.examDate,
+            color: '#7C6FFF',
+          })
+
+        if (examError) throw examError
+      }
+
+      navigate('/dashboard', { replace: true })
+    } catch {
+      setSaveError('Fehler beim Speichern. Bitte versuche es erneut.')
       setSubmitting(false)
     }
-    goTo(3)
   }
 
   if (loading) {
@@ -223,7 +233,7 @@ export default function Onboarding() {
                 formData={formData}
                 setFormData={setFormData}
                 submitting={submitting}
-                onNext={handleStep1}
+                onNext={() => goTo(2)}
               />
             )}
             {currentStep === 2 && (
@@ -232,14 +242,16 @@ export default function Onboarding() {
                 setFormData={setFormData}
                 submitting={submitting}
                 onBack={() => goTo(1)}
-                onNext={() => handleStep2(false)}
-                onSkip={() => handleStep2(true)}
+                onNext={() => goTo(3)}
+                onSkip={() => goTo(3)}
               />
             )}
             {currentStep === 3 && (
               <Step3
                 examName={formData.examName}
-                onFinish={() => navigate('/dashboard', { replace: true })}
+                submitting={submitting}
+                error={saveError}
+                onFinish={handleFinish}
               />
             )}
           </motion.div>
@@ -326,9 +338,7 @@ function Step1({
         className="w-full py-3 rounded-xl text-sm font-semibold text-white mt-8 transition-opacity"
         style={{ backgroundColor: '#7C6FFF', opacity: submitting ? 0.7 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}
       >
-        {submitting
-          ? <span className="flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" />Wird gespeichert…</span>
-          : 'Weiter →'}
+        Weiter →
       </button>
     </div>
   )
@@ -407,9 +417,7 @@ function Step2({
             cursor: submitting || !canSubmit ? 'not-allowed' : 'pointer',
           }}
         >
-          {submitting
-            ? <span className="flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" />…</span>
-            : 'Weiter →'}
+          Weiter →
         </button>
       </div>
 
@@ -426,41 +434,74 @@ function Step2({
 
 // ─── Schritt 3: Abschluss ─────────────────────────────────────────────────────
 
-function Step3({ examName, onFinish }: { examName: string; onFinish: () => void }) {
+function Step3({
+  examName, submitting, error, onFinish,
+}: {
+  examName: string
+  submitting: boolean
+  error: string | null
+  onFinish: () => void
+}) {
   return (
     <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: '#16161F', border: '1px solid #2A2A3A' }}>
       <motion.div
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
-        transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
+        transition={{ type: 'spring', stiffness: 180, damping: 12, delay: 0.1 }}
         className="flex justify-center mb-6"
+        style={{ fontSize: '72px', lineHeight: 1 }}
       >
-        <div
-          className="w-20 h-20 rounded-full flex items-center justify-center"
-          style={{ backgroundColor: '#0F2D1B', border: '2px solid #4ADE80' }}
-        >
-          <CheckCircle2 size={40} color="#4ADE80" />
-        </div>
+        🎉
       </motion.div>
 
-      <h2 className="text-2xl font-bold mb-2" style={{ color: '#E8E8F0' }}>Alles bereit! 🎉</h2>
-      <p className="text-sm mb-2" style={{ color: '#9090A8' }}>Dein Profil ist eingerichtet.</p>
-      {examName && (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <h2 className="text-2xl font-bold mb-3" style={{ color: '#E8E8F0' }}>
+          Willkommen bei StudyFlow!
+        </h2>
         <p className="text-sm mb-8" style={{ color: '#9090A8' }}>
-          Prüfung <span style={{ color: '#7C6FFF', fontWeight: 600 }}>„{examName}"</span> wurde hinzugefügt.
+          {examName.trim()
+            ? `Wir helfen dir, ${examName.trim()} zu meistern. Lass uns starten!`
+            : 'Dein Profil ist eingerichtet. Lass uns starten!'}
         </p>
+      </motion.div>
+
+      {error && (
+        <motion.div
+          className="flex items-center gap-2 rounded-xl p-3 mb-5 text-sm"
+          style={{ backgroundColor: '#2D1B1B', border: '1px solid #5C2D2D', color: '#F87171' }}
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <AlertCircle size={16} className="shrink-0" />
+          {error}
+        </motion.div>
       )}
-      {!examName && <div className="mb-8" />}
 
       <motion.button
         onClick={onFinish}
-        className="w-full py-3 rounded-xl text-sm font-semibold text-white"
-        style={{ backgroundColor: '#7C6FFF' }}
+        disabled={submitting}
+        className="w-full py-3.5 rounded-xl text-sm font-semibold text-white transition-opacity"
+        style={{
+          backgroundColor: '#7C6FFF',
+          opacity: submitting ? 0.7 : 1,
+          cursor: submitting ? 'not-allowed' : 'pointer',
+        }}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
+        transition={{ delay: 0.5 }}
       >
-        Zu StudyFlow →
+        {submitting ? (
+          <span className="flex items-center justify-center gap-2">
+            <Loader2 size={16} className="animate-spin" />
+            Wird gespeichert…
+          </span>
+        ) : (
+          'Zum Dashboard →'
+        )}
       </motion.button>
     </div>
   )
