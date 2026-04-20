@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabase'
+import UpgradeBanner from '../components/UpgradeBanner'
 
 // ─── Typen ────────────────────────────────────────────────────────────────────
 
@@ -273,9 +274,12 @@ export default function Dashboard() {
   const [profileName, setProfileName] = useState('')
   const [exams, setExams] = useState<Exam[]>([])
   const [dueCards, setDueCards] = useState(0)
+  const [plan, setPlan] = useState<string>('free')
+  const [totalExamCount, setTotalExamCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showAddExam, setShowAddExam] = useState(false)
+  const [showUpgrade, setShowUpgrade] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -284,10 +288,10 @@ export default function Dashboard() {
       try {
         const today = new Date().toISOString().split('T')[0]
 
-        const [profileRes, examsRes, cardsRes] = await Promise.all([
+        const [profileRes, examsRes, cardsRes, totalRes] = await Promise.all([
           supabase
             .from('user_profiles')
-            .select('name, university')
+            .select('name, university, plan')
             .eq('id', user!.id)
             .single(),
           supabase
@@ -301,6 +305,10 @@ export default function Dashboard() {
             .select('id', { count: 'exact', head: true })
             .eq('user_id', user!.id)
             .lte('next_review', today),
+          supabase
+            .from('exams')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user!.id),
         ])
 
         if (!profileRes.data?.university) {
@@ -309,8 +317,10 @@ export default function Dashboard() {
         }
 
         setProfileName(profileRes.data.name ?? user!.user_metadata?.full_name ?? '')
+        setPlan(profileRes.data.plan ?? 'free')
         setExams((examsRes.data ?? []) as Exam[])
         setDueCards(cardsRes.count ?? 0)
+        setTotalExamCount(totalRes.count ?? 0)
       } catch {
         setError('Daten konnten nicht geladen werden.')
       } finally {
@@ -455,7 +465,13 @@ export default function Dashboard() {
         </div>
 
         <button
-          onClick={() => setShowAddExam(true)}
+          onClick={() => {
+            if (plan === 'free' && totalExamCount >= 1) {
+              setShowUpgrade(true)
+            } else {
+              setShowAddExam(true)
+            }
+          }}
           className="w-full py-3 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2 transition-opacity hover:opacity-80"
           style={{ backgroundColor: '#16161F', border: '1px dashed #3A3A5A', color: '#7C6FFF' }}
         >
@@ -468,9 +484,13 @@ export default function Dashboard() {
         {showAddExam && (
           <AddExamModal
             onClose={() => setShowAddExam(false)}
-            onSave={handleExamAdded}
+            onSave={(exam) => {
+              handleExamAdded(exam)
+              setTotalExamCount((n) => n + 1)
+            }}
           />
         )}
+        {showUpgrade && <UpgradeBanner onClose={() => setShowUpgrade(false)} />}
       </AnimatePresence>
     </>
   )
