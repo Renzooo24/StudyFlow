@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { BookOpen, User, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabase'
+import Footer from '../components/Footer'
 
 // ─── Validierung ─────────────────────────────────────────────────────────────
 
@@ -152,7 +153,7 @@ export default function Signup() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4 py-12"
+      className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
       style={{ backgroundColor: '#0F0F14' }}
     >
       <motion.div
@@ -274,6 +275,7 @@ export default function Signup() {
           </Link>
         </p>
       </motion.div>
+      <Footer />
     </div>
   )
 }
