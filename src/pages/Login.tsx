@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { BookOpen, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import Footer from '../components/Footer'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -29,7 +30,7 @@ export default function Login() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
+      className="min-h-screen flex flex-col items-center justify-center px-4"
       style={{ backgroundColor: '#0F0F14' }}
     >
       <motion.div
@@ -194,6 +195,7 @@ export default function Login() {
           </Link>
         </p>
       </motion.div>
+      <Footer />
     </div>
   )
 }

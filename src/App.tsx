@@ -14,6 +14,8 @@ import ExamDetail from './pages/ExamDetail'
 import StudySession from './pages/StudySession'
 import StudyOverview from './pages/StudyOverview'
 import Settings from './pages/Settings'
+import Impressum from './pages/Impressum'
+import Datenschutz from './pages/Datenschutz'
 
 export default function App() {
   const checkSession = useAuthStore((s) => s.checkSession)
@@ -102,6 +104,10 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* Öffentliche Seiten */}
+      <Route path="/impressum" element={<Impressum />} />
+      <Route path="/datenschutz" element={<Datenschutz />} />
 
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
