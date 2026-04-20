@@ -316,7 +316,7 @@ export default function StudySession() {
       easiness_factor: newEasinessFactor,
       repetitions: newRepetitions,
       next_review: nextReviewDate.toISOString().split('T')[0],
-      last_review: new Date().toISOString().split('T')[0],
+      last_reviewed: new Date().toISOString(),
     }).eq('id', card.id)
     setResults((prev) => [...prev, rating])
     setCurrentIndex((prev) => prev + 1)
