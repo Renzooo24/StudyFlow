@@ -11,8 +11,8 @@ import Onboarding from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'
 import Exams from './pages/Exams'
 import ExamDetail from './pages/ExamDetail'
-import ComingSoon from './pages/ComingSoon'
 import StudySession from './pages/StudySession'
+import StudyOverview from './pages/StudyOverview'
 import Settings from './pages/Settings'
 
 export default function App() {
@@ -87,7 +87,7 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <ComingSoon title="Lernen" />
+              <StudyOverview />
             </AppLayout>
           </ProtectedRoute>
         }
