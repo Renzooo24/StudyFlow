@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard'
 import Exams from './pages/Exams'
 import ExamDetail from './pages/ExamDetail'
 import ComingSoon from './pages/ComingSoon'
+import StudySession from './pages/StudySession'
 
 export default function App() {
   const checkSession = useAuthStore((s) => s.checkSession)
@@ -68,6 +69,15 @@ export default function App() {
             <AppLayout>
               <ExamDetail />
             </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* Lern-Session – kein AppLayout (Vollbild) */}
+      <Route
+        path="/study/:examId"
+        element={
+          <ProtectedRoute>
+            <StudySession />
           </ProtectedRoute>
         }
       />
