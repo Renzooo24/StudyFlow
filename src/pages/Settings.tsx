@@ -178,7 +178,7 @@ export default function Settings() {
   // Profil-Felder
   const [name, setName]           = useState('')
   const [university, setUniversity] = useState('')
-  const [subject, setSubject]     = useState('')
+  const [subject, setSubject]     = useState('')   // DB-Spalte: study_program
   const [semester, setSemester]   = useState('')
   const [plan, setPlan]           = useState('free')
   const [dailyGoal, setDailyGoal] = useState('20')
@@ -195,15 +195,15 @@ export default function Settings() {
     if (!user) return
     supabase
       .from('user_profiles')
-      .select('name, university, subject, semester, plan, daily_goal')
+      .select('name, university, study_program, semester, plan, daily_goal')
       .eq('id', user.id)
       .single()
       .then(({ data }) => {
         if (data) {
           setName(data.name ?? '')
           setUniversity(data.university ?? '')
-          setSubject(data.subject ?? '')
-          setSemester(data.semester ?? '')
+          setSubject(data.study_program ?? '')
+          setSemester(data.semester != null ? String(data.semester) : '')
           setPlan(data.plan ?? 'free')
           setDailyGoal(String(data.daily_goal ?? 20))
         }
@@ -220,7 +220,7 @@ export default function Settings() {
       .update({
         name: name.trim(),
         university: university.trim(),
-        subject: subject.trim(),
+        study_program: subject.trim(),
         semester: semester.trim(),
         daily_goal: parseInt(dailyGoal) || 20,
       })
