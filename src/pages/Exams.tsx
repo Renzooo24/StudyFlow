@@ -111,7 +111,7 @@ function UpgradeBanner({ onClose }: { onClose: () => void }) {
           Free-Limit erreicht
         </h2>
         <p className="text-sm mb-6" style={{ color: '#9090A8' }}>
-          Im Free-Plan sind maximal 2 Prüfungen möglich. Upgrade auf Premium für unbegrenzte Prüfungen.
+          Im Free-Plan ist maximal 1 Prüfung möglich. Upgrade auf Premium für unbegrenzte Prüfungen.
         </p>
         <button
           className="w-full py-3 rounded-xl text-sm font-semibold text-white mb-3 transition-opacity hover:opacity-80"
@@ -173,7 +173,7 @@ export default function Exams() {
   }, [user])
 
   const handleNewExamClick = () => {
-    if (plan === 'free' && exams.length >= 2) {
+    if (plan === 'free' && exams.length >= 1) {
       setShowUpgrade(true)
     } else {
       setShowModal(true)
@@ -281,7 +281,7 @@ export default function Exams() {
           >
             <Zap size={16} style={{ color: '#7C6FFF', flexShrink: 0 }} />
             <p className="text-xs" style={{ color: '#6060A0' }}>
-              Free-Plan: {exams.length}/2 Prüfungen.{' '}
+              Free-Plan: {exams.length}/1 Prüfung.{' '}
               <button
                 className="font-medium underline"
                 style={{ color: '#7C6FFF' }}
