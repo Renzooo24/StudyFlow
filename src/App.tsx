@@ -2,12 +2,14 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
 import ProtectedRoute from './components/ProtectedRoute'
+import AppLayout from './components/AppLayout'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Onboarding from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'
+import ComingSoon from './pages/ComingSoon'
 
 export default function App() {
   const checkSession = useAuthStore((s) => s.checkSession)
@@ -18,16 +20,15 @@ export default function App() {
 
   return (
     <Routes>
-      {/* Startseite leitet direkt zum Login weiter */}
       <Route path="/" element={<Navigate to="/login" replace />} />
 
-      {/* Öffentliche Routen */}
+      {/* Auth-Routen – kein AppLayout */}
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* Geschützte Routen */}
+      {/* Onboarding – kein AppLayout */}
       <Route
         path="/onboarding"
         element={
@@ -36,16 +37,49 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* App-Routen – mit AppLayout */}
       <Route
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <AppLayout>
+              <Dashboard />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/exams"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <ComingSoon title="Prüfungen" />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/study"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <ComingSoon title="Lernen" />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <ComingSoon title="Einstellungen" />
+            </AppLayout>
           </ProtectedRoute>
         }
       />
 
-      {/* Fallback */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )

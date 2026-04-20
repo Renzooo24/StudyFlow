@@ -368,7 +368,7 @@ export default function Dashboard() {
           </div>
           <button
             onClick={logout}
-            className="p-2 rounded-xl transition-opacity hover:opacity-70"
+            className="md:hidden p-2 rounded-xl transition-opacity hover:opacity-70"
             style={{ backgroundColor: '#1A1A24', border: '1px solid #2A2A3A', color: '#6060A0' }}
             aria-label="Ausloggen"
           >
