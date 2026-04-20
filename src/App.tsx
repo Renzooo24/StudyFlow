@@ -9,6 +9,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Onboarding from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'
+import Exams from './pages/Exams'
 import ComingSoon from './pages/ComingSoon'
 
 export default function App() {
@@ -54,7 +55,17 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <ComingSoon title="Prüfungen" />
+              <Exams />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/exams/:id"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <ComingSoon title="Prüfungsdetails" />
             </AppLayout>
           </ProtectedRoute>
         }
