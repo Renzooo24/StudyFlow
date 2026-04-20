@@ -195,15 +195,15 @@ export default function Settings() {
     if (!user) return
     supabase
       .from('user_profiles')
-      .select('name, university, subject, semester, plan, daily_goal')
+      .select('name, university, study_program, semester, plan, daily_goal')
       .eq('id', user.id)
       .single()
       .then(({ data }) => {
         if (data) {
           setName(data.name ?? '')
           setUniversity(data.university ?? '')
-          setSubject(data.subject ?? '')
-          setSemester(data.semester ?? '')
+          setSubject(data.study_program ?? '')
+          setSemester(data.semester != null ? String(data.semester) : '')
           setPlan(data.plan ?? 'free')
           setDailyGoal(String(data.daily_goal ?? 20))
         }
@@ -220,8 +220,8 @@ export default function Settings() {
       .update({
         name: name.trim(),
         university: university.trim(),
-        subject: subject.trim(),
-        semester: semester.trim(),
+        study_program: subject.trim(),
+        semester: parseInt(semester) || null,
         daily_goal: parseInt(dailyGoal) || 20,
       })
       .eq('id', user.id)
