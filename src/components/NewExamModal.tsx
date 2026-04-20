@@ -157,6 +157,8 @@ export default function NewExamModal({ onClose, onCreated }: Props) {
                 border: `1px solid ${focused === 'date' ? '#7C6FFF' : '#2A2A3A'}`,
                 color: '#E8E8F0',
                 colorScheme: 'dark',
+                width: '100%',
+                boxSizing: 'border-box',
               }}
             />
           </div>
