@@ -274,6 +274,7 @@ export default function Dashboard() {
   const [profileName, setProfileName] = useState('')
   const [exams, setExams] = useState<Exam[]>([])
   const [dueCards, setDueCards] = useState(0)
+  const [firstDueExamId, setFirstDueExamId] = useState<string | null>(null)
   const [plan, setPlan] = useState<string>('free')
   const [totalExamCount, setTotalExamCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -302,9 +303,10 @@ export default function Dashboard() {
             .order('exam_date', { ascending: true }),
           supabase
             .from('flashcards')
-            .select('id', { count: 'exact', head: true })
+            .select('exam_id', { count: 'exact' })
             .eq('user_id', user!.id)
-            .lte('next_review', today),
+            .lte('next_review', today)
+            .limit(1),
           supabase
             .from('exams')
             .select('id', { count: 'exact', head: true })
@@ -320,6 +322,7 @@ export default function Dashboard() {
         setPlan(profileRes.data.plan ?? 'free')
         setExams((examsRes.data ?? []) as Exam[])
         setDueCards(cardsRes.count ?? 0)
+        setFirstDueExamId(cardsRes.data?.[0]?.exam_id ?? null)
         setTotalExamCount(totalRes.count ?? 0)
       } catch {
         setError('Daten konnten nicht geladen werden.')
@@ -419,6 +422,7 @@ export default function Dashboard() {
                 <span className="text-sm ml-2">Karte{dueCards !== 1 ? 'n' : ''} fällig</span>
               </p>
               <button
+                onClick={() => firstDueExamId && navigate(`/study/${firstDueExamId}`)}
                 className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-80"
                 style={{ backgroundColor: '#7C6FFF' }}
               >
