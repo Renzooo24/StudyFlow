@@ -13,6 +13,7 @@ import Exams from './pages/Exams'
 import ExamDetail from './pages/ExamDetail'
 import ComingSoon from './pages/ComingSoon'
 import StudySession from './pages/StudySession'
+import Settings from './pages/Settings'
 
 export default function App() {
   const checkSession = useAuthStore((s) => s.checkSession)
@@ -96,7 +97,7 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <ComingSoon title="Einstellungen" />
+              <Settings />
             </AppLayout>
           </ProtectedRoute>
         }
