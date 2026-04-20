@@ -3,10 +3,13 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Brain, Plus, ChevronDown, ChevronUp, Trash2,
-  Loader2, AlertCircle, BookOpen, BarChart2, Settings,
+  Loader2, AlertCircle, BookOpen, BarChart2, Settings, Upload, Zap,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabase'
+import NewFlashcardModal from '../components/NewFlashcardModal'
+import BulkImportModal from '../components/BulkImportModal'
+import UpgradeBanner from '../components/UpgradeBanner'
 
 // ─── Typen ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +31,7 @@ interface Card {
 type Tab = 'cards' | 'stats' | 'settings'
 
 const COLORS = ['#7C6FFF', '#FF6F7C', '#6FFFAA', '#FFD06F', '#6FC8FF', '#FF9F6F']
+const FREE_CARD_LIMIT = 30
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -127,134 +131,34 @@ function CardItem({ card, onDelete }: { card: Card; onDelete: (id: string) => vo
   )
 }
 
-// ─── NewCardForm ──────────────────────────────────────────────────────────────
-
-function NewCardForm({
-  examId, userId, onCreated, onCancel,
-}: {
-  examId: string; userId: string; onCreated: (card: Card) => void; onCancel: () => void
-}) {
-  const [front, setFront] = useState('')
-  const [back, setBack] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [focused, setFocused] = useState<string | null>(null)
-
-  const canSave = front.trim().length > 0 && back.trim().length > 0
-
-  const handleSave = async () => {
-    if (!canSave) return
-    setSaving(true)
-    setError(null)
-    try {
-      const { data, error: dbError } = await supabase
-        .from('flashcards')
-        .insert({ exam_id: examId, user_id: userId, front: front.trim(), back: back.trim() })
-        .select()
-        .single()
-      if (dbError) throw dbError
-      onCreated(data as Card)
-      setFront('')
-      setBack('')
-      setSaving(false)
-    } catch {
-      setError('Fehler beim Anlegen. Bitte versuche es erneut.')
-      setSaving(false)
-    }
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      className="rounded-2xl p-5 mb-3"
-      style={{ backgroundColor: '#16161F', border: '1px solid #7C6FFF' }}
-    >
-      <p className="text-sm font-semibold mb-4" style={{ color: '#E8E8F0' }}>Neue Karte</p>
-      {error && <p className="text-xs mb-3" style={{ color: '#F87171' }}>{error}</p>}
-      <div className="space-y-3">
-        <div>
-          <label className="block text-xs font-medium mb-1.5" style={{ color: '#B0B0C8' }}>Vorderseite</label>
-          <textarea
-            value={front}
-            onChange={(e) => setFront(e.target.value)}
-            onFocus={() => setFocused('front')}
-            onBlur={() => setFocused(null)}
-            placeholder="Begriff oder Frage…"
-            rows={2}
-            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none"
-            style={{
-              backgroundColor: '#0F0F14',
-              border: `1px solid ${focused === 'front' ? '#7C6FFF' : '#2A2A3A'}`,
-              color: '#E8E8F0',
-            }}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium mb-1.5" style={{ color: '#B0B0C8' }}>Rückseite</label>
-          <textarea
-            value={back}
-            onChange={(e) => setBack(e.target.value)}
-            onFocus={() => setFocused('back')}
-            onBlur={() => setFocused(null)}
-            placeholder="Antwort oder Erklärung…"
-            rows={2}
-            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none"
-            style={{
-              backgroundColor: '#0F0F14',
-              border: `1px solid ${focused === 'back' ? '#7C6FFF' : '#2A2A3A'}`,
-              color: '#E8E8F0',
-            }}
-          />
-        </div>
-      </div>
-      <div className="flex gap-2 mt-4">
-        <button
-          onClick={onCancel}
-          className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-opacity hover:opacity-80"
-          style={{ backgroundColor: '#1A1A24', color: '#9090A8', border: '1px solid #2A2A3A' }}
-        >
-          Abbrechen
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={saving || !canSave}
-          className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity"
-          style={{ backgroundColor: '#7C6FFF', opacity: saving || !canSave ? 0.5 : 1, cursor: saving || !canSave ? 'not-allowed' : 'pointer' }}
-        >
-          {saving
-            ? <span className="flex items-center justify-center gap-1.5"><Loader2 size={14} className="animate-spin" />…</span>
-            : 'Anlegen'}
-        </button>
-      </div>
-    </motion.div>
-  )
-}
-
 // ─── Tab: Karteikarten ────────────────────────────────────────────────────────
 
 function TabCards({
-  cards, examId, userId, onCardsChange,
+  cards, plan,
+  onNewCard, onBulkImport, onDelete,
 }: {
-  cards: Card[]; examId: string; userId: string; onCardsChange: (cards: Card[]) => void
+  cards: Card[]
+  plan: string
+  onNewCard: () => void
+  onBulkImport: () => void
+  onDelete: (id: string) => void
 }) {
-  const [showForm, setShowForm] = useState(false)
-
-  const handleCreated = (card: Card) => {
-    onCardsChange([...cards, card])
-    setShowForm(false)
-  }
-
-  const handleDelete = (id: string) => {
-    onCardsChange(cards.filter((c) => c.id !== id))
-  }
+  const atLimit = plan === 'free' && cards.length >= FREE_CARD_LIMIT
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
+      {/* Action bar */}
+      <div className="flex items-center gap-2 mb-4 justify-end">
         <button
-          onClick={() => setShowForm((p) => !p)}
+          onClick={onBulkImport}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-opacity hover:opacity-80"
+          style={{ backgroundColor: '#1A1A24', color: '#9090A8', border: '1px solid #2A2A3A' }}
+        >
+          <Upload size={14} />
+          Mehrere importieren
+        </button>
+        <button
+          onClick={onNewCard}
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-80"
           style={{ backgroundColor: '#7C6FFF' }}
         >
@@ -263,20 +167,24 @@ function TabCards({
         </button>
       </div>
 
-      <AnimatePresence>
-        {showForm && (
-          <NewCardForm
-            examId={examId}
-            userId={userId}
-            onCreated={handleCreated}
-            onCancel={() => setShowForm(false)}
-          />
-        )}
-      </AnimatePresence>
+      {/* Free-plan limit hint */}
+      {atLimit && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center gap-3 rounded-xl p-3 mb-4"
+          style={{ backgroundColor: '#1A1A24', border: '1px solid #2A2A3A' }}
+        >
+          <Zap size={14} style={{ color: '#7C6FFF', flexShrink: 0 }} />
+          <p className="text-xs flex-1" style={{ color: '#6060A0' }}>
+            Free-Limit: {cards.length}/{FREE_CARD_LIMIT} Karten pro Prüfung.
+          </p>
+        </motion.div>
+      )}
 
       <div className="space-y-2">
         <AnimatePresence>
-          {cards.length === 0 && !showForm ? (
+          {cards.length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -289,7 +197,7 @@ function TabCards({
             </motion.div>
           ) : (
             cards.map((card) => (
-              <CardItem key={card.id} card={card} onDelete={handleDelete} />
+              <CardItem key={card.id} card={card} onDelete={onDelete} />
             ))
           )}
         </AnimatePresence>
@@ -484,16 +392,21 @@ export default function ExamDetail() {
 
   const [exam, setExam] = useState<Exam | null>(null)
   const [cards, setCards] = useState<Card[]>([])
+  const [plan, setPlan] = useState<string>('free')
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [activeTab, setActiveTab] = useState<Tab>('cards')
+
+  const [showNewCard, setShowNewCard] = useState(false)
+  const [showBulkImport, setShowBulkImport] = useState(false)
+  const [showCardLimit, setShowCardLimit] = useState(false)
 
   const today = new Date().toISOString().split('T')[0]
 
   useEffect(() => {
     if (!user || !id) return
     async function load() {
-      const [examRes, cardsRes] = await Promise.all([
+      const [examRes, cardsRes, profileRes] = await Promise.all([
         supabase
           .from('exams')
           .select('id, name, exam_date, color, difficulty')
@@ -505,6 +418,11 @@ export default function ExamDetail() {
           .select('id, front, back, next_review')
           .eq('exam_id', id)
           .order('created_at', { ascending: true }),
+        supabase
+          .from('user_profiles')
+          .select('plan')
+          .eq('id', user!.id)
+          .single(),
       ])
 
       if (!examRes.data) {
@@ -512,11 +430,40 @@ export default function ExamDetail() {
       } else {
         setExam(examRes.data as Exam)
         setCards((cardsRes.data ?? []) as Card[])
+        setPlan(profileRes.data?.plan ?? 'free')
       }
       setLoading(false)
     }
     load()
   }, [user, id])
+
+  const handleNewCardClick = () => {
+    if (plan === 'free' && cards.length >= FREE_CARD_LIMIT) {
+      setShowCardLimit(true)
+    } else {
+      setShowNewCard(true)
+    }
+  }
+
+  const handleBulkImportClick = () => {
+    if (plan === 'free' && cards.length >= FREE_CARD_LIMIT) {
+      setShowCardLimit(true)
+    } else {
+      setShowBulkImport(true)
+    }
+  }
+
+  const handleCardCreated = (card: Card) => {
+    setCards((prev) => [...prev, card])
+  }
+
+  const handleCardsImported = (newCards: Card[]) => {
+    setCards((prev) => [...prev, ...newCards])
+  }
+
+  const handleCardDelete = (cardId: string) => {
+    setCards((prev) => prev.filter((c) => c.id !== cardId))
+  }
 
   if (loading) {
     return (
@@ -559,111 +506,134 @@ export default function ExamDetail() {
   const dueCount = cards.filter((c) => c.next_review <= today).length
 
   return (
-    <div className="max-w-lg mx-auto" style={{ backgroundColor: '#0F0F14', minHeight: '100vh' }}>
-      {/* Header */}
-      <div className="px-4 pt-6 pb-5" style={{ borderBottom: '1px solid #1A1A24' }}>
-        <button
-          onClick={() => navigate('/exams')}
-          className="flex items-center gap-1.5 text-sm mb-5 transition-opacity hover:opacity-70"
-          style={{ color: '#6060A0' }}
-        >
-          <ArrowLeft size={16} />
-          Zurück
-        </button>
+    <>
+      <div className="max-w-lg mx-auto" style={{ backgroundColor: '#0F0F14', minHeight: '100vh' }}>
+        {/* Header */}
+        <div className="px-4 pt-6 pb-5" style={{ borderBottom: '1px solid #1A1A24' }}>
+          <button
+            onClick={() => navigate('/exams')}
+            className="flex items-center gap-1.5 text-sm mb-5 transition-opacity hover:opacity-70"
+            style={{ color: '#6060A0' }}
+          >
+            <ArrowLeft size={16} />
+            Zurück
+          </button>
 
-        <div className="flex items-start gap-3 mb-4">
-          <div className="w-1 h-8 rounded-full mt-1 shrink-0" style={{ backgroundColor: exam.color }} />
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold leading-tight" style={{ color: '#E8E8F0' }}>{exam.name}</h1>
-            <div className="flex items-center gap-3 mt-1">
-              <p className="text-sm" style={{ color: '#6060A0' }}>
-                {new Date(exam.exam_date).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </p>
-              {isUrgent ? (
-                <motion.span
-                  animate={{ opacity: [1, 0.4, 1] }}
-                  transition={{ repeat: Infinity, duration: 1.2 }}
-                  className="text-xs font-semibold"
-                  style={{ color: countdownColor }}
-                >
-                  {countdownText}
-                </motion.span>
-              ) : (
-                <span className="text-xs font-medium" style={{ color: countdownColor }}>{countdownText}</span>
-              )}
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-1 h-8 rounded-full mt-1 shrink-0" style={{ backgroundColor: exam.color }} />
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold leading-tight" style={{ color: '#E8E8F0' }}>{exam.name}</h1>
+              <div className="flex items-center gap-3 mt-1">
+                <p className="text-sm" style={{ color: '#6060A0' }}>
+                  {new Date(exam.exam_date).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+                {isUrgent ? (
+                  <motion.span
+                    animate={{ opacity: [1, 0.4, 1] }}
+                    transition={{ repeat: Infinity, duration: 1.2 }}
+                    className="text-xs font-semibold"
+                    style={{ color: countdownColor }}
+                  >
+                    {countdownText}
+                  </motion.span>
+                ) : (
+                  <span className="text-xs font-medium" style={{ color: countdownColor }}>{countdownText}</span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Stats row */}
-        <div className="flex items-center gap-4 mb-5">
-          <div className="flex items-center gap-1.5">
-            <BookOpen size={14} style={{ color: '#6060A0' }} />
-            <span className="text-sm" style={{ color: '#9090A8' }}>
-              <span className="font-semibold" style={{ color: '#E8E8F0' }}>{cards.length}</span> Karten
-            </span>
-          </div>
-          {dueCount > 0 && (
+          {/* Stats row */}
+          <div className="flex items-center gap-4 mb-5">
             <div className="flex items-center gap-1.5">
-              <Brain size={14} style={{ color: '#7C6FFF' }} />
+              <BookOpen size={14} style={{ color: '#6060A0' }} />
               <span className="text-sm" style={{ color: '#9090A8' }}>
-                <span className="font-semibold" style={{ color: '#7C6FFF' }}>{dueCount}</span> heute fällig
+                <span className="font-semibold" style={{ color: '#E8E8F0' }}>{cards.length}</span> Karten
               </span>
             </div>
-          )}
+            {dueCount > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Brain size={14} style={{ color: '#7C6FFF' }} />
+                <span className="text-sm" style={{ color: '#9090A8' }}>
+                  <span className="font-semibold" style={{ color: '#7C6FFF' }}>{dueCount}</span> heute fällig
+                </span>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => navigate(`/study/${exam.id}`)}
+            disabled={cards.length === 0}
+            className="w-full py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-80"
+            style={{ backgroundColor: '#7C6FFF', opacity: cards.length === 0 ? 0.4 : 1, cursor: cards.length === 0 ? 'not-allowed' : 'pointer' }}
+          >
+            <Brain size={16} />
+            Lernen starten
+          </button>
         </div>
 
-        <button
-          onClick={() => navigate(`/study/${exam.id}`)}
-          disabled={cards.length === 0}
-          className="w-full py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-80"
-          style={{ backgroundColor: '#7C6FFF', opacity: cards.length === 0 ? 0.4 : 1, cursor: cards.length === 0 ? 'not-allowed' : 'pointer' }}
-        >
-          <Brain size={16} />
-          Lernen starten
-        </button>
+        {/* Tabs */}
+        <div className="flex border-b" style={{ borderColor: '#1A1A24' }}>
+          {TABS.map(({ id: tabId, label }) => (
+            <button
+              key={tabId}
+              onClick={() => setActiveTab(tabId)}
+              className="flex-1 py-3.5 text-sm font-medium transition-colors relative"
+              style={{ color: activeTab === tabId ? '#7C6FFF' : '#6060A0' }}
+            >
+              {label}
+              {activeTab === tabId && (
+                <motion.div
+                  layoutId="tab-indicator"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                  style={{ backgroundColor: '#7C6FFF' }}
+                />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab-Inhalt */}
+        <div className="px-4 py-5">
+          {activeTab === 'cards' && (
+            <TabCards
+              cards={cards}
+              plan={plan}
+              onNewCard={handleNewCardClick}
+              onBulkImport={handleBulkImportClick}
+              onDelete={handleCardDelete}
+            />
+          )}
+          {activeTab === 'stats' && <TabStats />}
+          {activeTab === 'settings' && (
+            <TabSettings
+              exam={exam}
+              onUpdated={setExam}
+              onDeleted={() => navigate('/exams', { replace: true })}
+            />
+          )}
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b" style={{ borderColor: '#1A1A24' }}>
-        {TABS.map(({ id: tabId, label }) => (
-          <button
-            key={tabId}
-            onClick={() => setActiveTab(tabId)}
-            className="flex-1 py-3.5 text-sm font-medium transition-colors relative"
-            style={{ color: activeTab === tabId ? '#7C6FFF' : '#6060A0' }}
-          >
-            {label}
-            {activeTab === tabId && (
-              <motion.div
-                layoutId="tab-indicator"
-                className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
-                style={{ backgroundColor: '#7C6FFF' }}
-              />
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab-Inhalt */}
-      <div className="px-4 py-5">
-        {activeTab === 'cards' && (
-          <TabCards
-            cards={cards}
+      <AnimatePresence>
+        {showNewCard && (
+          <NewFlashcardModal
             examId={exam.id}
-            userId={user!.id}
-            onCardsChange={setCards}
+            onClose={() => setShowNewCard(false)}
+            onCreated={handleCardCreated}
           />
         )}
-        {activeTab === 'stats' && <TabStats />}
-        {activeTab === 'settings' && (
-          <TabSettings
-            exam={exam}
-            onUpdated={setExam}
-            onDeleted={() => navigate('/exams', { replace: true })}
+        {showBulkImport && (
+          <BulkImportModal
+            examId={exam.id}
+            onClose={() => setShowBulkImport(false)}
+            onImported={handleCardsImported}
           />
         )}
-      </div>
-    </div>
+        {showCardLimit && (
+          <UpgradeBanner onClose={() => setShowCardLimit(false)} />
+        )}
+      </AnimatePresence>
+    </>
   )
 }
