@@ -10,6 +10,7 @@ import ResetPassword from './pages/ResetPassword'
 import Onboarding from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'
 import Exams from './pages/Exams'
+import ExamDetail from './pages/ExamDetail'
 import ComingSoon from './pages/ComingSoon'
 
 export default function App() {
@@ -65,7 +66,7 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <ComingSoon title="Prüfungsdetails" />
+              <ExamDetail />
             </AppLayout>
           </ProtectedRoute>
         }
