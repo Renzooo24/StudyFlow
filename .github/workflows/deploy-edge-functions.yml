@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'supabase/functions/**'
+  workflow_dispatch: # ermöglicht manuellen Start über GitHub UI
 
 jobs:
   deploy:
