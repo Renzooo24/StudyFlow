@@ -3,13 +3,14 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Brain, Plus, ChevronDown, ChevronUp, Trash2,
-  Loader2, AlertCircle, BookOpen, BarChart2, Settings, Upload, Zap,
+  Loader2, AlertCircle, BookOpen, BarChart2, Settings, Upload, Zap, Sparkles,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabase'
 import NewFlashcardModal from '../components/NewFlashcardModal'
 import BulkImportModal from '../components/BulkImportModal'
 import UpgradeBanner from '../components/UpgradeBanner'
+import AIFlashcardGenerator from '../components/AIFlashcardGenerator'
 
 // ─── Typen ────────────────────────────────────────────────────────────────────
 
@@ -135,12 +136,13 @@ function CardItem({ card, onDelete }: { card: Card; onDelete: (id: string) => vo
 
 function TabCards({
   cards, plan,
-  onNewCard, onBulkImport, onDelete,
+  onNewCard, onBulkImport, onAIGenerate, onDelete,
 }: {
   cards: Card[]
   plan: string
   onNewCard: () => void
   onBulkImport: () => void
+  onAIGenerate: () => void
   onDelete: (id: string) => void
 }) {
   const atLimit = plan === 'free' && cards.length >= FREE_CARD_LIMIT
@@ -148,7 +150,7 @@ function TabCards({
   return (
     <div>
       {/* Action bar */}
-      <div className="flex items-center gap-2 mb-4 justify-end">
+      <div className="flex items-center gap-2 mb-4 justify-end flex-wrap">
         <button
           onClick={onBulkImport}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-opacity hover:opacity-80"
@@ -156,6 +158,14 @@ function TabCards({
         >
           <Upload size={14} />
           Mehrere importieren
+        </button>
+        <button
+          onClick={onAIGenerate}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-opacity hover:opacity-80"
+          style={{ backgroundColor: '#1A1A24', color: '#7C6FFF', border: '1px solid #2A2A3A' }}
+        >
+          <Sparkles size={14} />
+          KI-Karten
         </button>
         <button
           onClick={onNewCard}
@@ -400,6 +410,7 @@ export default function ExamDetail() {
   const [showNewCard, setShowNewCard] = useState(false)
   const [showBulkImport, setShowBulkImport] = useState(false)
   const [showCardLimit, setShowCardLimit] = useState(false)
+  const [showAIGenerator, setShowAIGenerator] = useState(false)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -450,6 +461,14 @@ export default function ExamDetail() {
       setShowCardLimit(true)
     } else {
       setShowBulkImport(true)
+    }
+  }
+
+  const handleAIGenerateClick = () => {
+    if (plan === 'free' && cards.length >= FREE_CARD_LIMIT) {
+      setShowCardLimit(true)
+    } else {
+      setShowAIGenerator(true)
     }
   }
 
@@ -601,6 +620,7 @@ export default function ExamDetail() {
               plan={plan}
               onNewCard={handleNewCardClick}
               onBulkImport={handleBulkImportClick}
+              onAIGenerate={handleAIGenerateClick}
               onDelete={handleCardDelete}
             />
           )}
@@ -632,6 +652,14 @@ export default function ExamDetail() {
         )}
         {showCardLimit && (
           <UpgradeBanner onClose={() => setShowCardLimit(false)} />
+        )}
+        {showAIGenerator && (
+          <AIFlashcardGenerator
+            examId={exam.id}
+            plan={plan}
+            onClose={() => setShowAIGenerator(false)}
+            onCardsAdded={handleCardsImported}
+          />
         )}
       </AnimatePresence>
     </>

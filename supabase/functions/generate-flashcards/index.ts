@@ -9,6 +9,12 @@ const corsHeaders = {
 
 const FREE_PLAN_MONTHLY_LIMIT = 3
 
+const DIFFICULTY_INSTRUCTIONS: Record<string, string> = {
+  einfach: 'Erstelle einfache, grundlegende Fragen, die Definitionen und Kernbegriffe abfragen.',
+  mittel: 'Erstelle Fragen mittlerer Schwierigkeit, die Verständnis und Anwendung prüfen.',
+  schwer: 'Erstelle anspruchsvolle Fragen, die tiefes Verständnis, Analyse und Verknüpfungen zwischen Konzepten erfordern.',
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -39,14 +45,14 @@ Deno.serve(async (req) => {
     }
 
     // ── Parse body ──────────────────────────────────────────────────────────
-    let body: { content?: string; count?: number; examId?: string }
+    let body: { content?: string; count?: number; examId?: string; difficulty?: string }
     try {
       body = await req.json()
     } catch {
       return json({ error: 'Invalid JSON body' }, 400)
     }
 
-    const { content, count, examId } = body
+    const { content, count, examId, difficulty } = body
     if (!content || typeof content !== 'string' || !content.trim()) {
       return json({ error: 'Feld "content" fehlt oder ist leer.' }, 400)
     }
@@ -88,19 +94,23 @@ Deno.serve(async (req) => {
     // ── Anthropic API ───────────────────────────────────────────────────────
     const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! })
 
-    const systemPrompt = `Du bist ein Lerncoach für Studierende. Erstelle aus dem gegebenen Text präzise Lernkarten im JSON-Format.
+    const difficultyKey = difficulty && DIFFICULTY_INSTRUCTIONS[difficulty] ? difficulty : 'mittel'
+    const difficultyInstruction = DIFFICULTY_INSTRUCTIONS[difficultyKey]
+    const cardCount = count as number
+    const plural = cardCount === 1 ? '' : 'n'
 
-Antworte NUR mit einem validen JSON-Array ohne weiteren Text, Markdown oder Codeblöcke:
-[
-  { "front": "Frage oder Begriff", "back": "Antwort oder Erklärung" }
-]
-
-Regeln:
-- Erstelle genau ${count} Karte${count === 1 ? '' : 'n'}
-- Jede Karte deckt einen klar abgrenzbaren Sachverhalt ab
-- Fragen sind klar und eindeutig formuliert
-- Antworten sind prägnant, aber vollständig
-- Nutze die Sprache des Eingabetexts`
+    const systemPrompt = 'Du bist ein Lerncoach für Studierende. Erstelle aus dem gegebenen Text präzise Lernkarten im JSON-Format.\n\n'
+      + 'Antworte NUR mit einem validen JSON-Array ohne weiteren Text, Markdown oder Codeblöcke:\n'
+      + '[\n'
+      + '  { "front": "Frage oder Begriff", "back": "Antwort oder Erklärung" }\n'
+      + ']\n\n'
+      + 'Regeln:\n'
+      + '- Erstelle genau ' + String(cardCount) + ' Karte' + plural + '\n'
+      + '- Schwierigkeitsstufe: ' + difficultyInstruction + '\n'
+      + '- Jede Karte deckt einen klar abgrenzbaren Sachverhalt ab\n'
+      + '- Fragen sind klar und eindeutig formuliert\n'
+      + '- Antworten sind prägnant, aber vollständig\n'
+      + '- Nutze die Sprache des Eingabetexts'
 
     let claudeResponse: Anthropic.Message
     try {
@@ -124,7 +134,6 @@ Regeln:
 
     let cards: Array<{ front: string; back: string }>
     try {
-      // Strip optional markdown fences that Claude might add anyway
       const cleaned = rawText.replace(/^```(?:json)?\s*/m, '').replace(/\s*```$/m, '').trim()
       const match = cleaned.match(/\[[\s\S]*\]/)
       if (!match) throw new Error('No JSON array found')
@@ -138,29 +147,7 @@ Regeln:
       )
     }
 
-    // ── Save flashcards ─────────────────────────────────────────────────────
-    const today = new Date().toISOString().split('T')[0]
-    const flashcardsToInsert = cards.map((card) => ({
-      exam_id: examId,
-      user_id: user.id,
-      front: card.front,
-      back: card.back,
-      interval: 1,
-      easiness_factor: 2.5,
-      repetitions: 0,
-      next_review: today,
-    }))
-
-    const { error: insertError } = await adminClient
-      .from('flashcards')
-      .insert(flashcardsToInsert)
-
-    if (insertError) {
-      console.error('Flashcard insert error:', insertError)
-      return json({ error: 'Fehler beim Speichern der Karten.' }, 500)
-    }
-
-    // ── Log generation ──────────────────────────────────────────────────────
+    // ── Log generation (cards are saved by the frontend after preview) ──────
     await adminClient.from('ai_generations').insert({
       user_id: user.id,
       type: 'flashcards',
