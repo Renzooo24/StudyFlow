@@ -20,4 +20,11 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* iOS Safari setzt für date-Inputs eine eigene Breite – globaler Override */
+  input[type="date"] {
+    width: 100%;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+  }
 }
