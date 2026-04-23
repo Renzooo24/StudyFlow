@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import Anthropic from 'npm:@anthropic-ai/sdk'
+import Anthropic from 'npm:@anthropic-ai/sdk@0.26.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
       + '- Antworten sind prägnant, aber vollständig\n'
       + '- Nutze die Sprache des Eingabetexts'
 
-    let claudeResponse: Anthropic.Message
+    let claudeResponse: Awaited<ReturnType<typeof anthropic.messages.create>>
     try {
       claudeResponse = await anthropic.messages.create({
         model: 'claude-sonnet-4-6',
