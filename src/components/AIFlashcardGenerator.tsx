@@ -93,8 +93,9 @@ export default function AIFlashcardGenerator({ examId, plan, onClose, onCardsAdd
       }
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error((body as { error?: string }).error ?? 'Fehler beim Generieren.')
+        const body = await res.json().catch(() => ({})) as Record<string, unknown>
+        const msg = (body.error ?? body.message ?? body.msg) as string | undefined
+        throw new Error(msg ? String(msg) : `Serverfehler (${res.status})`)
       }
 
       const data = await res.json() as { cards: GeneratedCard[] }
